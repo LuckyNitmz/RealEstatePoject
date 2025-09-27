@@ -39,6 +39,11 @@
           background-color: #fece51;
           cursor: pointer;
           border: none;
+          border-radius: 10px;
+          transition: all 0.4s ease;
+            &:hover {
+    scale: 1.05;   
+  }
         }
       }
 
@@ -55,12 +60,17 @@
 
         button{
           width: 100px;
+          margin-left: 4px;
           background-color: teal;
           border: none;
           color: white;
           padding: 10px 20px;
           cursor: pointer;
           border-radius: 5px;
+          transition: all 0.4s ease;
+            &:hover {
+    scale: 1.05;   
+  }
         }
 
         img{
