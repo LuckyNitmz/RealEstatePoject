@@ -9,6 +9,7 @@ export const SocketContextProvider = ({ children }) => {
   const { currentUser } = useContext(AuthContext);
   const [socket, setSocket] = useState(null);
   const [onlineUsers, setOnlineUsers] = useState([]);
+  const [activeChatId, setActiveChatId] = useState(null);
   const { fetch: fetchNotifications, reset: resetNotifications } = useNotificationStore();
 
   useEffect(() => {
@@ -67,11 +68,20 @@ export const SocketContextProvider = ({ children }) => {
     }
   };
 
+  const setActiveChat = (chatId) => {
+    setActiveChatId(chatId);
+    if (socket && currentUser) {
+      socket.emit("setActiveChat", { userId: currentUser.id, chatId });
+    }
+  };
+
   return (
     <SocketContext.Provider value={{ 
       socket, 
       onlineUsers, 
-      markChatAsRead 
+      markChatAsRead,
+      setActiveChat,
+      activeChatId 
     }}>
       {children}
     </SocketContext.Provider>

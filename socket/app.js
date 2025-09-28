@@ -7,6 +7,7 @@ const io = new Server({
 });
 
 let onlineUser = [];
+let activeChats = new Map(); // Map userId -> activeChatId
 
 const addUser = (userId, socketId) => {
   const userExits = onlineUser.find((user) => user.userId === userId);
@@ -18,6 +19,10 @@ const addUser = (userId, socketId) => {
 };
 
 const removeUser = (socketId) => {
+  const userToRemove = onlineUser.find((user) => user.socketId === socketId);
+  if (userToRemove) {
+    activeChats.delete(userToRemove.userId);
+  }
   onlineUser = onlineUser.filter((user) => user.socketId !== socketId);
   console.log('User disconnected, remaining online users:', onlineUser.length);
 };
@@ -42,12 +47,20 @@ io.on("connection", (socket) => {
       console.log(`Sending message from ${data.userId} to ${receiverId}`);
       io.to(receiver.socketId).emit("getMessage", data);
       
-      // Also send notification update
-      io.to(receiver.socketId).emit("getNotification", {
-        senderId: data.userId,
-        isRead: false,
-        date: new Date().toISOString(),
-      });
+      // Only send notification if the receiver doesn't have this chat open
+      const receiverActiveChatId = activeChats.get(receiverId);
+      const isReceiverChatActive = receiverActiveChatId && receiverActiveChatId === data.chatId;
+      
+      if (!isReceiverChatActive) {
+        console.log(`Sending notification to ${receiverId} (chat not active)`);
+        io.to(receiver.socketId).emit("getNotification", {
+          senderId: data.userId,
+          isRead: false,
+          date: new Date().toISOString(),
+        });
+      } else {
+        console.log(`Not sending notification to ${receiverId} (chat is active)`);
+      }
     } else {
       console.log(`Receiver ${receiverId} not found online`);
     }
@@ -57,6 +70,16 @@ io.on("connection", (socket) => {
   socket.on("markChatAsRead", ({ chatId, userId }) => {
     // Broadcast to all users that this chat has been read
     socket.broadcast.emit("chatMarkedAsRead", { chatId, userId });
+  });
+
+  // Handle setting active chat
+  socket.on("setActiveChat", ({ userId, chatId }) => {
+    console.log(`User ${userId} set active chat to:`, chatId);
+    if (chatId) {
+      activeChats.set(userId, chatId);
+    } else {
+      activeChats.delete(userId);
+    }
   });
 
   socket.on("disconnect", () => {

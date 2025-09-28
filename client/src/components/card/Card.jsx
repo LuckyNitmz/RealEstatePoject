@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useContext, useEffect } from "react";
+import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../../context/AuthContext";
 import { useFavoriteStore } from "../../lib/favoriteStore";
 import apiRequest from "../../lib/apiRequest";
@@ -11,6 +11,7 @@ function Card({ item }) {
   const { isFavorited, toggleFavorite, initializeFavorites } = useFavoriteStore();
   
   const saved = isFavorited(item.id);
+  const [isToggling, setIsToggling] = useState(false);
   
   // Initialize favorites when component mounts and user is available
   useEffect(() => {
@@ -28,10 +29,17 @@ function Card({ item }) {
       return;
     }
     
+    if (isToggling) {
+      return; // Prevent multiple clicks
+    }
+    
+    setIsToggling(true);
     try {
       await toggleFavorite(item.id);
     } catch (err) {
       console.error("Failed to toggle favorite:", err);
+    } finally {
+      setIsToggling(false);
     }
   };
 

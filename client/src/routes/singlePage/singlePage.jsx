@@ -3,7 +3,7 @@ import Slider from "../../components/slider/Slider";
 import Map from "../../components/map/Map";
 import { useNavigate, useLoaderData } from "react-router-dom";
 import DOMPurify from "dompurify";
-import { useContext, useEffect } from "react";
+import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../../context/AuthContext";
 import { useFavoriteStore } from "../../lib/favoriteStore";
 import apiRequest from "../../lib/apiRequest";
@@ -15,6 +15,7 @@ function SinglePage() {
   const { isFavorited, toggleFavorite, initializeFavorites } = useFavoriteStore();
   
   const saved = isFavorited(post.id);
+  const [isToggling, setIsToggling] = useState(false);
   
   // Initialize favorites when component mounts and user is available
   useEffect(() => {
@@ -36,10 +37,17 @@ function SinglePage() {
       return;
     }
     
+    if (isToggling) {
+      return; // Prevent multiple clicks
+    }
+    
+    setIsToggling(true);
     try {
       await toggleFavorite(post.id);
     } catch (err) {
       console.error("Failed to toggle favorite:", err);
+    } finally {
+      setIsToggling(false);
     }
   };
 

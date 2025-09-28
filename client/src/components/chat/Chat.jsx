@@ -10,7 +10,7 @@ function Chat({ chats: initialChats }) {
   const [chat, setChat] = useState(null);
   const [chats, setChats] = useState(initialChats || []);
   const { currentUser } = useContext(AuthContext);
-  const { socket } = useContext(SocketContext);
+  const { socket, setActiveChat } = useContext(SocketContext);
 
   const messageEndRef = useRef();
 
@@ -29,6 +29,13 @@ function Chat({ chats: initialChats }) {
       // Listen for new messages to update chat list appearance
       const handleNewMessage = (data) => {
         console.log('New message received in chat list:', data);
+        
+        // Don't update UI if current user is the sender of the message
+        if (data.userId === currentUser.id) {
+          console.log('Message is from current user, skipping UI update');
+          return;
+        }
+        
         // Update the specific chat's seenBy status
         setChats(prevChats => 
           prevChats.map(chatItem => {
@@ -101,6 +108,9 @@ function Chat({ chats: initialChats }) {
         decrease();
       }
       setChat({ ...res.data, receiver });
+      
+      // Set this as the active chat
+      setActiveChat(id);
       
       // Mark chat as read via socket for real-time updates
       if (socket) {
@@ -190,7 +200,10 @@ function Chat({ chats: initialChats }) {
               <img src={chat.receiver.avatar || "noavatar.jpg"} alt="" />
               {chat.receiver.username}
             </div>
-            <span className="close" onClick={() => setChat(null)}>
+            <span className="close" onClick={() => {
+              setChat(null);
+              setActiveChat(null);
+            }}>
               X
             </span>
           </div>

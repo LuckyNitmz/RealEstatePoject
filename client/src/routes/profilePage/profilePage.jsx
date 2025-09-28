@@ -3,7 +3,7 @@ import List from "../../components/list/List";
 import "./profilePage.scss";
 import apiRequest from "../../lib/apiRequest";
 import { Await, Link, useLoaderData, useNavigate } from "react-router-dom";
-import { Suspense, useContext, useEffect, useState } from "react";
+import { Suspense, useContext, useEffect, useState, useMemo } from "react";
 import { AuthContext } from "../../context/AuthContext";
 import { useFavoriteStore } from "../../lib/favoriteStore";
 
@@ -11,12 +11,13 @@ function ProfilePage() {
   const data = useLoaderData();
   const { updateUser, currentUser } = useContext(AuthContext);
   const navigate = useNavigate();
-  const { favorites, initializeFavorites } = useFavoriteStore();
+  const { favorites, initializeFavorites, lastUpdated } = useFavoriteStore();
   const [savedPosts, setSavedPosts] = useState([]);
   const [userPosts, setUserPosts] = useState([]);
   const [chats, setChats] = useState([]);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
   const [chatDataLoaded, setChatDataLoaded] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState(null);
   
   // Initialize favorites when component mounts
   useEffect(() => {
@@ -55,19 +56,38 @@ function ProfilePage() {
   // Update saved posts when favorites change (real-time sync)
   useEffect(() => {
     const fetchSavedPosts = async () => {
-      if (currentUser && initialDataLoaded) {
+      // Only fetch if we haven't synced recently or if favorites were updated
+      if (currentUser && initialDataLoaded && (!lastSyncTime || (lastUpdated && lastUpdated > lastSyncTime))) {
         try {
           const response = await apiRequest("/users/profilePosts");
-          setSavedPosts(response.data.savedPosts || []);
-          console.log('Updated saved posts:', response.data.savedPosts?.length || 0);
+          const newSavedPosts = response.data.savedPosts || [];
+          setSavedPosts(newSavedPosts);
+          setLastSyncTime(Date.now());
+          console.log('Updated saved posts:', newSavedPosts.length);
         } catch (error) {
           console.error("Failed to fetch saved posts:", error);
         }
       }
     };
     
-    fetchSavedPosts();
-  }, [favorites, currentUser, initialDataLoaded]);
+    // Add a small delay to allow for API operations to complete
+    const timeoutId = setTimeout(fetchSavedPosts, 100);
+    return () => clearTimeout(timeoutId);
+  }, [lastUpdated, currentUser, initialDataLoaded, lastSyncTime]);
+  
+  // Immediate optimistic update - combine server data with optimistic favorites state
+  const displayedSavedPosts = useMemo(() => {
+    // Start with server-provided saved posts
+    const basePost = [...savedPosts];
+    
+    // Add posts that are favorited but not yet in savedPosts (optimistic additions)
+    const favoriteIds = Array.from(favorites);
+    const existingIds = new Set(basePost.map(post => post.id));
+    
+    // For now, we can only display posts that are already in savedPosts or have been removed
+    // This ensures immediate removal but requires server sync for additions
+    return basePost.filter(post => favorites.has(post.id));
+  }, [savedPosts, favorites]);
 
   const handleLogout = async () => {
     try {
@@ -130,7 +150,7 @@ function ProfilePage() {
           </div>
           {initialDataLoaded ? (
             <List 
-              posts={savedPosts} 
+              posts={displayedSavedPosts} 
               emptyMessage="No saved properties yet." 
               emptySubMessage="Save properties you like to see them here!" 
             />
