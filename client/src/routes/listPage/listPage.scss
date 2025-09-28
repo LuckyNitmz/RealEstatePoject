@@ -17,14 +17,56 @@
       overflow-y: scroll;
       padding-bottom: 50px;
     }
+    
+    .emptyState {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 400px;
+      text-align: center;
+      color: #666;
+      
+      h3 {
+        font-size: 1.8rem;
+        margin-bottom: 15px;
+        color: #333;
+      }
+      
+      p {
+        font-size: 1.1rem;
+        line-height: 1.6;
+      }
+    }
   }
+  
   .mapContainer {
     flex: 2;
     height: 100%;
     background-color: #fcf5f3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
     @include md{
       display: none;
+    }
+    
+    .emptyMapState {
+      text-align: center;
+      color: #666;
+      padding: 40px 20px;
+      
+      h3 {
+        font-size: 1.5rem;
+        margin-bottom: 10px;
+        color: #333;
+      }
+      
+      p {
+        font-size: 1rem;
+        line-height: 1.5;
+      }
     }
   }
 }

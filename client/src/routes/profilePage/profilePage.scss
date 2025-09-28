@@ -80,6 +80,28 @@
           object-fit: cover;
         }
       }
+      
+      .emptyStateActions {
+        margin-top: 20px;
+        text-align: center;
+        
+        .emptyStateButton {
+          padding: 15px 30px;
+          background-color: #fece51;
+          border: none;
+          border-radius: 10px;
+          cursor: pointer;
+          font-size: 1rem;
+          font-weight: 500;
+          color: #333;
+          transition: all 0.3s ease;
+          
+          &:hover {
+            background-color: #fec038;
+            transform: translateY(-2px);
+          }
+        }
+      }
     }
   }
   .chatContainer {

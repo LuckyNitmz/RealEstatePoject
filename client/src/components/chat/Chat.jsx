@@ -6,14 +6,76 @@ import { format } from "timeago.js";
 import { SocketContext } from "../../context/SocketContext";
 import { useNotificationStore } from "../../lib/notificationStore";
 
-function Chat({ chats }) {
+function Chat({ chats: initialChats }) {
   const [chat, setChat] = useState(null);
+  const [chats, setChats] = useState(initialChats || []);
   const { currentUser } = useContext(AuthContext);
   const { socket } = useContext(SocketContext);
 
   const messageEndRef = useRef();
 
   const decrease = useNotificationStore((state) => state.decrease);
+  
+  // Initialize chats from props
+  useEffect(() => {
+    if (initialChats && initialChats.length > 0) {
+      setChats(initialChats);
+    }
+  }, [initialChats]);
+  
+  // Socket listeners for real-time updates
+  useEffect(() => {
+    if (socket && currentUser) {
+      // Listen for new messages to update chat list appearance
+      const handleNewMessage = (data) => {
+        console.log('New message received in chat list:', data);
+        // Update the specific chat's seenBy status
+        setChats(prevChats => 
+          prevChats.map(chatItem => {
+            if (chatItem.id === data.chatId) {
+              // Only mark as unread if this chat is not currently open
+              const isCurrentlyOpen = chat && chat.id === data.chatId;
+              const seenBy = isCurrentlyOpen 
+                ? chatItem.seenBy // Keep current seenBy if chat is open
+                : chatItem.seenBy.filter(id => id !== currentUser.id); // Mark as unread
+              
+              return {
+                ...chatItem,
+                seenBy,
+                lastMessage: data.text
+              };
+            }
+            return chatItem;
+          })
+        );
+      };
+      
+      // Listen for chat marked as read events
+      const handleChatMarkedAsRead = ({ chatId, userId }) => {
+        console.log('Chat marked as read:', chatId, 'by user:', userId);
+        setChats(prevChats => 
+          prevChats.map(chatItem => {
+            if (chatItem.id === chatId) {
+              // Add user to seenBy array if not already there
+              const seenBy = chatItem.seenBy.includes(userId) 
+                ? chatItem.seenBy 
+                : [...chatItem.seenBy, userId];
+              return { ...chatItem, seenBy };
+            }
+            return chatItem;
+          })
+        );
+      };
+      
+      socket.on("getMessage", handleNewMessage);
+      socket.on("chatMarkedAsRead", handleChatMarkedAsRead);
+      
+      return () => {
+        socket.off("getMessage", handleNewMessage);
+        socket.off("chatMarkedAsRead", handleChatMarkedAsRead);
+      };
+    }
+  }, [socket, currentUser, chat]);
 
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -21,11 +83,29 @@ function Chat({ chats }) {
 
   const handleOpenChat = async (id, receiver) => {
     try {
+      // Immediately update UI optimistically
+      setChats(prevChats => 
+        prevChats.map(chatItem => {
+          if (chatItem.id === id) {
+            const seenBy = chatItem.seenBy.includes(currentUser.id) 
+              ? chatItem.seenBy 
+              : [...chatItem.seenBy, currentUser.id];
+            return { ...chatItem, seenBy };
+          }
+          return chatItem;
+        })
+      );
+      
       const res = await apiRequest("/chats/" + id);
       if (!res.data.seenBy.includes(currentUser.id)) {
         decrease();
       }
       setChat({ ...res.data, receiver });
+      
+      // Mark chat as read via socket for real-time updates
+      if (socket) {
+        socket.emit("markChatAsRead", { chatId: id, userId: currentUser.id });
+      }
     } catch (err) {
       console.log(err);
     }
@@ -55,23 +135,31 @@ function Chat({ chats }) {
     const read = async () => {
       try {
         await apiRequest.put("/chats/read/" + chat.id);
+        // Emit socket event to update notifications in real-time
+        if (socket) {
+          socket.emit("markChatAsRead", { chatId: chat.id, userId: currentUser.id });
+        }
       } catch (err) {
         console.log(err);
       }
     };
 
     if (chat && socket) {
-      socket.on("getMessage", (data) => {
+      const handleGetMessage = (data) => {
+        console.log('Received message:', data);
         if (chat.id === data.chatId) {
           setChat((prev) => ({ ...prev, messages: [...prev.messages, data] }));
-          read();
+          read(); // Auto-mark as read when in chat
         }
-      });
+      };
+
+      socket.on("getMessage", handleGetMessage);
+      
+      return () => {
+        socket.off("getMessage", handleGetMessage);
+      };
     }
-    return () => {
-      socket.off("getMessage");
-    };
-  }, [socket, chat]);
+  }, [socket, chat, currentUser.id]);
 
   return (
     <div className="chat">

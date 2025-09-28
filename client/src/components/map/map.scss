@@ -3,3 +3,29 @@
   height: 100%;
   border-radius: 20px;
 }
+
+.mapEmptyState {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: #f8f8f8;
+  border-radius: 20px;
+  color: #666;
+  text-align: center;
+  padding: 40px 20px;
+  
+  h3 {
+    font-size: 1.5rem;
+    margin-bottom: 10px;
+    color: #333;
+  }
+  
+  p {
+    font-size: 1rem;
+    line-height: 1.5;
+    margin: 0;
+  }
+}

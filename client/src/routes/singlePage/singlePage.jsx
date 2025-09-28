@@ -3,15 +3,25 @@ import Slider from "../../components/slider/Slider";
 import Map from "../../components/map/Map";
 import { useNavigate, useLoaderData } from "react-router-dom";
 import DOMPurify from "dompurify";
-import { useContext, useState, useEffect } from "react";
+import { useContext, useEffect } from "react";
 import { AuthContext } from "../../context/AuthContext";
+import { useFavoriteStore } from "../../lib/favoriteStore";
 import apiRequest from "../../lib/apiRequest";
 
 function SinglePage() {
   const post = useLoaderData();
-  const [saved, setSaved] = useState(post.isSaved);
   const { currentUser } = useContext(AuthContext);
   const navigate = useNavigate();
+  const { isFavorited, toggleFavorite, initializeFavorites } = useFavoriteStore();
+  
+  const saved = isFavorited(post.id);
+  
+  // Initialize favorites when component mounts and user is available
+  useEffect(() => {
+    if (currentUser) {
+      initializeFavorites();
+    }
+  }, [currentUser, initializeFavorites]);
 
   // Log post data for debugging
   useEffect(() => {
@@ -23,20 +33,25 @@ function SinglePage() {
   const handleSave = async () => {
     if (!currentUser) {
       navigate("/login");
+      return;
     }
-    // AFTER REACT 19 UPDATE TO USEOPTIMISTIK HOOK
-    setSaved((prev) => !prev);
+    
     try {
-      await apiRequest.post("/users/save", { postId: post.id });
+      await toggleFavorite(post.id);
     } catch (err) {
-      console.log(err);
-      setSaved((prev) => !prev);
+      console.error("Failed to toggle favorite:", err);
     }
   };
 
   const handleSendMessage = async () => {
     if (!currentUser) {
       navigate("/login");
+      return;
+    }
+    
+    // Check if trying to chat with own post
+    if (post.user.id === currentUser.id) {
+      alert("This is your Post");
       return;
     }
     

@@ -3,15 +3,71 @@ import List from "../../components/list/List";
 import "./profilePage.scss";
 import apiRequest from "../../lib/apiRequest";
 import { Await, Link, useLoaderData, useNavigate } from "react-router-dom";
-import { Suspense, useContext } from "react";
+import { Suspense, useContext, useEffect, useState } from "react";
 import { AuthContext } from "../../context/AuthContext";
+import { useFavoriteStore } from "../../lib/favoriteStore";
 
 function ProfilePage() {
   const data = useLoaderData();
-
   const { updateUser, currentUser } = useContext(AuthContext);
-
   const navigate = useNavigate();
+  const { favorites, initializeFavorites } = useFavoriteStore();
+  const [savedPosts, setSavedPosts] = useState([]);
+  const [userPosts, setUserPosts] = useState([]);
+  const [chats, setChats] = useState([]);
+  const [initialDataLoaded, setInitialDataLoaded] = useState(false);
+  const [chatDataLoaded, setChatDataLoaded] = useState(false);
+  
+  // Initialize favorites when component mounts
+  useEffect(() => {
+    if (currentUser) {
+      initializeFavorites();
+    }
+  }, [currentUser, initializeFavorites]);
+  
+  // Load initial data from loader
+  useEffect(() => {
+    if (data?.postResponse && !initialDataLoaded) {
+      data.postResponse.then(response => {
+        setUserPosts(response.data.userPosts || []);
+        setSavedPosts(response.data.savedPosts || []);
+        setInitialDataLoaded(true);
+      }).catch(error => {
+        console.error("Failed to load initial data:", error);
+        setInitialDataLoaded(true);
+      });
+    }
+  }, [data, initialDataLoaded]);
+  
+  // Load chat data from loader
+  useEffect(() => {
+    if (data?.chatResponse && !chatDataLoaded) {
+      data.chatResponse.then(response => {
+        setChats(response.data || []);
+        setChatDataLoaded(true);
+      }).catch(error => {
+        console.error("Failed to load chat data:", error);
+        setChatDataLoaded(true);
+      });
+    }
+  }, [data, chatDataLoaded]);
+  
+  // Update saved posts when favorites change (real-time sync)
+  useEffect(() => {
+    const fetchSavedPosts = async () => {
+      if (currentUser && initialDataLoaded) {
+        try {
+          const response = await apiRequest("/users/profilePosts");
+          setSavedPosts(response.data.savedPosts || []);
+          console.log('Updated saved posts:', response.data.savedPosts?.length || 0);
+        } catch (error) {
+          console.error("Failed to fetch saved posts:", error);
+        }
+      }
+    };
+    
+    fetchSavedPosts();
+  }, [favorites, currentUser, initialDataLoaded]);
 
   const handleLogout = async () => {
     try {
@@ -51,37 +107,45 @@ function ProfilePage() {
               <button>Create New Post</button>
             </Link>
           </div>
-          <Suspense fallback={<p>Loading...</p>}>
-            <Await
-              resolve={data.postResponse}
-              errorElement={<p>Error loading posts!</p>}
-            >
-              {(postResponse) => <List posts={postResponse.data.userPosts} />}
-            </Await>
-          </Suspense>
+          {initialDataLoaded ? (
+            <>
+              <List 
+                posts={userPosts} 
+                emptyMessage="You haven't created any posts yet." 
+                emptySubMessage="Create your first property listing to get started!" 
+              />
+              {(!userPosts || userPosts.length === 0) && (
+                <div className="emptyStateActions">
+                  <Link to="/add">
+                    <button className="emptyStateButton">Create New Post</button>
+                  </Link>
+                </div>
+              )}
+            </>
+          ) : (
+            <p>Loading...</p>
+          )}
           <div className="title">
             <h1>Saved List</h1>
           </div>
-          <Suspense fallback={<p>Loading...</p>}>
-            <Await
-              resolve={data.postResponse}
-              errorElement={<p>Error loading posts!</p>}
-            >
-              {(postResponse) => <List posts={postResponse.data.savedPosts} />}
-            </Await>
-          </Suspense>
+          {initialDataLoaded ? (
+            <List 
+              posts={savedPosts} 
+              emptyMessage="No saved properties yet." 
+              emptySubMessage="Save properties you like to see them here!" 
+            />
+          ) : (
+            <p>Loading...</p>
+          )}
         </div>
       </div>
       <div className="chatContainer">
         <div className="wrapper">
-          <Suspense fallback={<p>Loading...</p>}>
-            <Await
-              resolve={data.chatResponse}
-              errorElement={<p>Error loading chats!</p>}
-            >
-              {(chatResponse) => <Chat chats={chatResponse.data}/>}
-            </Await>
-          </Suspense>
+          {chatDataLoaded ? (
+            <Chat chats={chats} />
+          ) : (
+            <p>Loading chats...</p>
+          )}
         </div>
       </div>
     </div>
