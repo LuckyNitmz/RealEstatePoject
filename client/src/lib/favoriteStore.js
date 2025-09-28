@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import apiRequest from "./apiRequest";
+import { useSavedPostsStore } from "./savedPostsStore";
 
 export const useFavoriteStore = create((set, get) => ({
   favorites: new Set(), // Using Set for O(1) lookup
@@ -53,7 +54,25 @@ export const useFavoriteStore = create((set, get) => ({
     set({ favorites: currentFavorites, lastUpdated: Date.now() });
     
     try {
-      await apiRequest.post("/users/save", { postId });
+      const response = await apiRequest.post("/users/save", { postId });
+      
+      // Update saved posts store immediately
+      const savedPostsStore = useSavedPostsStore.getState();
+      if (!wasFavorited) {
+        // If we're saving, we need to fetch the post data to add to saved posts
+        try {
+          const postResponse = await apiRequest(`/posts/${postId}`);
+          savedPostsStore.add(postResponse.data);
+          console.log('Added post to saved posts store:', postId);
+        } catch (postError) {
+          console.warn('Could not fetch post data for saved posts update:', postError);
+          // Still continue with the favorite operation even if we can't update saved posts
+        }
+      } else {
+        // If we're unsaving, remove from saved posts
+        savedPostsStore.remove(postId);
+        console.log('Removed post from saved posts store:', postId);
+      }
       
       // Remove from pending operations
       const updatedPendingOps = new Set(get().pendingOperations);

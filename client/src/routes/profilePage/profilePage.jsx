@@ -6,12 +6,14 @@ import { Await, Link, useLoaderData, useNavigate } from "react-router-dom";
 import { Suspense, useContext, useEffect, useState, useMemo } from "react";
 import { AuthContext } from "../../context/AuthContext";
 import { useFavoriteStore } from "../../lib/favoriteStore";
+import { useSavedPostsStore } from "../../lib/savedPostsStore";
 
 function ProfilePage() {
   const data = useLoaderData();
   const { updateUser, currentUser } = useContext(AuthContext);
   const navigate = useNavigate();
   const { favorites, initializeFavorites, lastUpdated } = useFavoriteStore();
+  const { setFromServer, getPostsArray } = useSavedPostsStore();
   const [savedPosts, setSavedPosts] = useState([]);
   const [userPosts, setUserPosts] = useState([]);
   const [chats, setChats] = useState([]);
@@ -31,7 +33,9 @@ function ProfilePage() {
     if (data?.postResponse && !initialDataLoaded) {
       data.postResponse.then(response => {
         setUserPosts(response.data.userPosts || []);
-        setSavedPosts(response.data.savedPosts || []);
+        const savedPosts = response.data.savedPosts || [];
+        setSavedPosts(savedPosts);
+        setFromServer(savedPosts); // Initialize optimistic store
         setInitialDataLoaded(true);
       }).catch(error => {
         console.error("Failed to load initial data:", error);
@@ -62,6 +66,7 @@ function ProfilePage() {
           const response = await apiRequest("/users/profilePosts");
           const newSavedPosts = response.data.savedPosts || [];
           setSavedPosts(newSavedPosts);
+          setFromServer(newSavedPosts); // Update optimistic store
           setLastSyncTime(Date.now());
           console.log('Updated saved posts:', newSavedPosts.length);
         } catch (error) {
@@ -75,19 +80,8 @@ function ProfilePage() {
     return () => clearTimeout(timeoutId);
   }, [lastUpdated, currentUser, initialDataLoaded, lastSyncTime]);
   
-  // Immediate optimistic update - combine server data with optimistic favorites state
-  const displayedSavedPosts = useMemo(() => {
-    // Start with server-provided saved posts
-    const basePost = [...savedPosts];
-    
-    // Add posts that are favorited but not yet in savedPosts (optimistic additions)
-    const favoriteIds = Array.from(favorites);
-    const existingIds = new Set(basePost.map(post => post.id));
-    
-    // For now, we can only display posts that are already in savedPosts or have been removed
-    // This ensures immediate removal but requires server sync for additions
-    return basePost.filter(post => favorites.has(post.id));
-  }, [savedPosts, favorites]);
+  // Use optimistic saved posts store for immediate updates
+  const displayedSavedPosts = getPostsArray();
 
   const handleLogout = async () => {
     try {

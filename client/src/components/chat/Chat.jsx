@@ -132,6 +132,23 @@ function Chat({ chats: initialChats }) {
       const res = await apiRequest.post("/messages/" + chat.id, { text });
       setChat((prev) => ({ ...prev, messages: [...prev.messages, res.data] }));
       e.target.reset();
+      
+      // Update chat list immediately for sender to keep it "read" (no yellow highlight)
+      setChats(prevChats => 
+        prevChats.map(chatItem => {
+          if (chatItem.id === chat.id) {
+            return {
+              ...chatItem,
+              lastMessage: text,
+              seenBy: chatItem.seenBy.includes(currentUser.id) 
+                ? chatItem.seenBy 
+                : [...chatItem.seenBy, currentUser.id]
+            };
+          }
+          return chatItem;
+        })
+      );
+      
       socket.emit("sendMessage", {
         receiverId: chat.receiver.id,
         data: res.data,

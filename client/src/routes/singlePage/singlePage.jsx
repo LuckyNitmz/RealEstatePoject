@@ -6,6 +6,7 @@ import DOMPurify from "dompurify";
 import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../../context/AuthContext";
 import { useFavoriteStore } from "../../lib/favoriteStore";
+import { useSavedPostsStore } from "../../lib/savedPostsStore";
 import apiRequest from "../../lib/apiRequest";
 
 function SinglePage() {
@@ -13,6 +14,7 @@ function SinglePage() {
   const { currentUser } = useContext(AuthContext);
   const navigate = useNavigate();
   const { isFavorited, toggleFavorite, initializeFavorites } = useFavoriteStore();
+  const { add: addToSavedPosts, remove: removeFromSavedPosts } = useSavedPostsStore();
   
   const saved = isFavorited(post.id);
   const [isToggling, setIsToggling] = useState(false);
@@ -43,9 +45,26 @@ function SinglePage() {
     
     setIsToggling(true);
     try {
+      const wasSaved = saved;
+      
+      // Optimistically update saved posts store immediately
+      if (!wasSaved) {
+        addToSavedPosts(post); // We have the full post data here
+      } else {
+        removeFromSavedPosts(post.id);
+      }
+      
       await toggleFavorite(post.id);
     } catch (err) {
       console.error("Failed to toggle favorite:", err);
+      
+      // Revert optimistic update on error
+      const wasSaved = !saved; // Revert state
+      if (wasSaved) {
+        addToSavedPosts(post);
+      } else {
+        removeFromSavedPosts(post.id);
+      }
     } finally {
       setIsToggling(false);
     }

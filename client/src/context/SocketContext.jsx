@@ -39,6 +39,11 @@ export const SocketContextProvider = ({ children }) => {
       // Listen for new notifications
       socket.on("getNotification", (notification) => {
         console.log('New notification received:', notification);
+        // Don't update notifications if current user is the sender
+        if (notification.senderId === currentUser.id) {
+          console.log('Notification is from current user, ignoring');
+          return;
+        }
         // Trigger notification refetch
         fetchNotifications();
       });
