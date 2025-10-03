@@ -23,6 +23,12 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
+// Root route for health check
+app.get("/", (req, res) => {
+  res.json({ message: "Real Estate API is running!", timestamp: new Date().toISOString() });
+});
+
+// API routes
 app.use("/api/auth", authRoute);
 app.use("/api/users", userRoute);
 app.use("/api/posts", postRoute);
@@ -30,6 +36,12 @@ app.use("/api/test", testRoute);
 app.use("/api/chats", chatRoute);
 app.use("/api/messages", messageRoute);
 
-app.listen(8800, () => {
-  console.log("Server is running!");
-});
+// For Vercel deployment, export the app instead of listening
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 8800;
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}!`);
+  });
+}
+
+export default app;

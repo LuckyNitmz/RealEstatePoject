@@ -1,14 +1,14 @@
 {
   "name": "api",
   "version": "1.0.0",
-  "main": "app.js",
+  "main": "index.js",
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-     "start": "node app.js",
+    "start": "node app.js",
     "dev": "nodemon app.js",
     "build": "prisma generate",
-    "postbuild": "prisma db push"
+    "vercel-build": "prisma generate && prisma db push"
   },
   "keywords": [],
   "author": "",
