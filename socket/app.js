@@ -4,7 +4,7 @@ import { createServer } from "http";
 const httpServer = createServer();
 const io = new Server(httpServer, {
   cors: {
-    origin: ["http://localhost:5173", "https://your-frontend-domain.vercel.app"],
+    origin: ["http://localhost:5173", "https://real-estate-poject-wwr3.vercel.app"],
     methods: ["GET", "POST"]
   },
 });

@@ -10,7 +10,16 @@ import messageRoute from "./routes/message.route.js";
 
 const app = express();
 
-app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
+const allowedOrigins = [
+  "http://localhost:5173", // Development
+  "https://real-estate-poject-wwr3.vercel.app", // Production
+  process.env.CLIENT_URL // Environment variable fallback
+].filter(Boolean);
+
+app.use(cors({ 
+  origin: allowedOrigins, 
+  credentials: true 
+}));
 app.use(express.json());
 app.use(cookieParser());
 
