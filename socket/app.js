@@ -1,8 +1,11 @@
 import { Server } from "socket.io";
+import { createServer } from "http";
 
-const io = new Server({
+const httpServer = createServer();
+const io = new Server(httpServer, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: ["http://localhost:5173", "https://your-frontend-domain.vercel.app"],
+    methods: ["GET", "POST"]
   },
 });
 
@@ -91,5 +94,7 @@ io.on("connection", (socket) => {
   });
 });
 
-io.listen("4000");
-console.log('Socket.io server running on port 4000');
+const PORT = process.env.PORT || 4000;
+httpServer.listen(PORT, () => {
+  console.log(`Socket.io server running on port ${PORT}`);
+});
