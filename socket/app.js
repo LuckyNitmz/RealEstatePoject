@@ -3,18 +3,40 @@ import express from "express";
 import { createServer } from "http";
 
 const app = express();
+
+// Add CORS middleware for Express
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', 'https://real-estate-poject-wwr3.vercel.app');
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
+
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
     origin: ["http://localhost:5173", "https://real-estate-poject-wwr3.vercel.app"],
     methods: ["GET", "POST"],
-    credentials: true
+    credentials: true,
+    allowedHeaders: ["content-type"]
   },
+  allowEIO3: true
 });
 
 // Add a basic route for health check
 app.get('/', (req, res) => {
   res.json({ message: 'Socket.IO server is running!', timestamp: new Date().toISOString() });
+});
+
+// Add Socket.IO path endpoint
+app.get('/socket.io/*', (req, res) => {
+  res.json({ message: 'Socket.IO endpoint', path: req.path });
 });
 
 let onlineUser = [];

@@ -13,9 +13,13 @@ export const SocketContextProvider = ({ children }) => {
   const { fetch: fetchNotifications, reset: resetNotifications } = useNotificationStore();
 
   useEffect(() => {
-    const socketURL = process.env.NODE_ENV === 'production' 
-      ? "https://real-estate-project.vercel.app" 
-      : "http://localhost:4000";
+    // Temporarily disable socket in production due to Vercel serverless limitations
+    if (process.env.NODE_ENV === 'production') {
+      console.log('Socket.IO disabled in production - using polling fallback');
+      return; // Skip socket connection in production
+    }
+    
+    const socketURL = "http://localhost:4000";
     const newSocket = io(socketURL);
     setSocket(newSocket);
 
