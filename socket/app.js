@@ -1,12 +1,20 @@
 import { Server } from "socket.io";
+import express from "express";
 import { createServer } from "http";
 
-const httpServer = createServer();
+const app = express();
+const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
     origin: ["http://localhost:5173", "https://real-estate-poject-wwr3.vercel.app"],
-    methods: ["GET", "POST"]
+    methods: ["GET", "POST"],
+    credentials: true
   },
+});
+
+// Add a basic route for health check
+app.get('/', (req, res) => {
+  res.json({ message: 'Socket.IO server is running!', timestamp: new Date().toISOString() });
 });
 
 let onlineUser = [];
@@ -95,6 +103,13 @@ io.on("connection", (socket) => {
 });
 
 const PORT = process.env.PORT || 4000;
-httpServer.listen(PORT, () => {
-  console.log(`Socket.io server running on port ${PORT}`);
-});
+
+// For Vercel deployment, export the app instead of listening in production
+if (process.env.NODE_ENV !== 'production') {
+  httpServer.listen(PORT, () => {
+    console.log(`Socket.io server running on port ${PORT}`);
+  });
+}
+
+// Export for Vercel
+export default httpServer;
