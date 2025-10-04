@@ -133,8 +133,12 @@ io.on("connection", (socket) => {
 
 const PORT = process.env.PORT || 4000;
 
-// For Vercel deployment, export the app instead of listening in production
-if (process.env.NODE_ENV !== 'production') {
+// For Vercel deployment, we need to handle both serverless and server environments
+if (process.env.VERCEL) {
+  // In Vercel serverless environment, just export the server
+  console.log('Running in Vercel serverless environment');
+} else {
+  // In regular server environment (development or other hosting)
   httpServer.listen(PORT, () => {
     console.log(`Socket.io server running on port ${PORT}`);
   });

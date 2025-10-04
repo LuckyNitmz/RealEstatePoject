@@ -10,32 +10,26 @@ export const SocketContextProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [activeChatId, setActiveChatId] = useState(null);
+  const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const { fetch: fetchNotifications, reset: resetNotifications } = useNotificationStore();
 
   useEffect(() => {
-    if (process.env.NODE_ENV === 'production') {
-      // TODO: Replace with your actual socket deployment URL
-      // Check your Vercel dashboard for the correct URL
-      const possibleSocketURLs = [
-        process.env.REACT_APP_SOCKET_URL,
-        "https://socket-gold-xi.vercel.app", // Common pattern
-        "https://full-stack-estate-main-socket.vercel.app", // Based on your project name
-        "https://socket-full-stack-estate-main.vercel.app", // Alternative pattern
-      ].filter(Boolean);
-      
-      // For now, disable socket in production until you provide the correct URL
-      console.warn('Socket.IO disabled in production - please update REACT_APP_SOCKET_URL environment variable');
-      console.log('Possible socket URLs to try:', possibleSocketURLs);
-      console.log('To fix: Set REACT_APP_SOCKET_URL in Vercel environment variables');
-      return;
-    }
+    const socketURL = process.env.NODE_ENV === 'production' 
+      ? "https://real-estate-poject.vercel.app" 
+      : "http://localhost:4000";
     
-    // Development socket connection
-    const socketURL = "http://localhost:4000";
+    console.log('Mode:', process.env.NODE_ENV);
+    console.log('Socket URL:', socketURL);
+    console.log('Environment variables:', {
+      NODE_ENV: process.env.NODE_ENV,
+      REACT_APP_SOCKET_URL: process.env.REACT_APP_SOCKET_URL
+    });
     console.log('Attempting to connect to socket:', socketURL);
     
     const newSocket = io(socketURL, {
-      transports: ['websocket', 'polling'],
+      transports: process.env.NODE_ENV === 'production' 
+        ? ['polling', 'websocket'] // Fallback to polling first in production
+        : ['websocket', 'polling'],
       timeout: 20000,
       forceNew: true,
     });
@@ -45,15 +39,23 @@ export const SocketContextProvider = ({ children }) => {
     newSocket.on('connect', () => {
       console.log('Socket connected successfully:', newSocket.id);
       console.log('Transport:', newSocket.io.engine.transport.name);
+      setConnectionStatus('connected');
     });
     
     newSocket.on('connect_error', (error) => {
       console.error('Socket connection error:', error.message);
       console.error('Error details:', error);
+      setConnectionStatus('error');
+      
+      // In production, if socket fails, continue without real-time features
+      if (process.env.NODE_ENV === 'production') {
+        console.warn('Socket connection failed in production, continuing without real-time features');
+      }
     });
     
     newSocket.on('disconnect', (reason) => {
       console.log('Socket disconnected:', reason);
+      setConnectionStatus('disconnected');
     });
 
     // Clean up on unmount
@@ -126,7 +128,8 @@ export const SocketContextProvider = ({ children }) => {
       onlineUsers, 
       markChatAsRead,
       setActiveChat,
-      activeChatId 
+      activeChatId,
+      connectionStatus 
     }}>
       {children}
     </SocketContext.Provider>
