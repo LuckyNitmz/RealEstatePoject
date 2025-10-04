@@ -21,12 +21,19 @@ app.use((req, res, next) => {
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: ["http://localhost:5173", "https://real-estate-poject-wwr3.vercel.app"],
-    methods: ["GET", "POST"],
+    origin: [
+      "http://localhost:5173",
+      "https://real-estate-poject-wwr3.vercel.app",
+      "http://localhost:3000",
+      "https://*.vercel.app"
+    ],
+    methods: ["GET", "POST", "OPTIONS"],
     credentials: true,
-    allowedHeaders: ["content-type"]
+    allowedHeaders: ["content-type", "authorization", "x-requested-with"],
+    optionsSuccessStatus: 200
   },
-  allowEIO3: true
+  allowEIO3: true,
+  transports: ['polling', 'websocket']
 });
 
 // Add a basic route for health check
