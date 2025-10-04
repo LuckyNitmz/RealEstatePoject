@@ -14,22 +14,19 @@ export const SocketContextProvider = ({ children }) => {
   const { fetch: fetchNotifications, reset: resetNotifications } = useNotificationStore();
 
   useEffect(() => {
-    const socketURL = process.env.NODE_ENV === 'production' 
-      ? "https://real-estate-poject.vercel.app" 
-      : "http://localhost:4000";
+    // Temporarily disable Socket.IO in production due to Vercel serverless limitations
+    if (process.env.NODE_ENV === 'production') {
+      console.log('Socket.IO disabled in production - using API polling for notifications');
+      setConnectionStatus('disabled');
+      return;
+    }
     
+    const socketURL = "http://localhost:4000";
     console.log('Mode:', process.env.NODE_ENV);
-    console.log('Socket URL:', socketURL);
-    console.log('Environment variables:', {
-      NODE_ENV: process.env.NODE_ENV,
-      REACT_APP_SOCKET_URL: process.env.REACT_APP_SOCKET_URL
-    });
     console.log('Attempting to connect to socket:', socketURL);
     
     const newSocket = io(socketURL, {
-      transports: process.env.NODE_ENV === 'production' 
-        ? ['polling', 'websocket'] // Fallback to polling first in production
-        : ['websocket', 'polling'],
+      transports: ['websocket', 'polling'],
       timeout: 20000,
       forceNew: true,
     });
@@ -64,54 +61,81 @@ export const SocketContextProvider = ({ children }) => {
     };
   }, []);
 
+  // Handle notification fetching and polling
   useEffect(() => {
-    if (currentUser && socket) {
-      console.log('Emitting newUser event for:', currentUser.id);
-      socket.emit("newUser", currentUser.id);
-      
+    let pollingInterval;
+    
+    if (currentUser) {
       // Fetch initial notifications
       fetchNotifications();
+      
+      if (socket) {
+        // Real-time mode with Socket.IO
+        console.log('Emitting newUser event for:', currentUser.id);
+        socket.emit("newUser", currentUser.id);
 
-      // Listen for online users updates
-      socket.on("getOnlineUsers", (users) => {
-        setOnlineUsers(users);
-        console.log('Online users updated:', users);
-      });
+        // Listen for online users updates
+        socket.on("getOnlineUsers", (users) => {
+          setOnlineUsers(users);
+          console.log('Online users updated:', users);
+        });
 
-      // Listen for new notifications
-      socket.on("getNotification", (notification) => {
-        console.log('New notification received:', notification);
-        // Don't update notifications if current user is the sender
-        if (notification.senderId === currentUser.id) {
-          console.log('Notification is from current user, ignoring');
-          return;
-        }
-        // Trigger notification refetch
-        fetchNotifications();
-      });
+        // Listen for new notifications
+        socket.on("getNotification", (notification) => {
+          console.log('New notification received:', notification);
+          // Don't update notifications if current user is the sender
+          if (notification.senderId === currentUser.id) {
+            console.log('Notification is from current user, ignoring');
+            return;
+          }
+          // Trigger notification refetch
+          fetchNotifications();
+        });
 
-      // Listen for chat marked as read events
-      socket.on("chatMarkedAsRead", ({ chatId, userId }) => {
-        console.log('Chat marked as read:', chatId, 'by user:', userId);
-        // Refresh notifications when someone else reads a chat
-        fetchNotifications();
-      });
-
-      // Cleanup listeners when user changes
+        // Listen for chat marked as read events
+        socket.on("chatMarkedAsRead", ({ chatId, userId }) => {
+          console.log('Chat marked as read:', chatId, 'by user:', userId);
+          // Refresh notifications when someone else reads a chat
+          fetchNotifications();
+        });
+      } else if (process.env.NODE_ENV === 'production') {
+        // Fallback polling mode when Socket.IO is disabled
+        console.log('Setting up notification polling (30 seconds interval)');
+        pollingInterval = setInterval(() => {
+          console.log('Polling for notifications...');
+          fetchNotifications();
+        }, 30000); // Poll every 30 seconds
+      }
+      
+      // Cleanup function
       return () => {
-        socket.off("getOnlineUsers");
-        socket.off("getNotification");
-        socket.off("chatMarkedAsRead");
+        if (socket) {
+          socket.off("getOnlineUsers");
+          socket.off("getNotification");
+          socket.off("chatMarkedAsRead");
+        }
+        if (pollingInterval) {
+          clearInterval(pollingInterval);
+        }
       };
-    } else if (!currentUser && socket) {
+    } else {
       // Reset notifications when user logs out
       resetNotifications();
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
     }
   }, [currentUser, socket, fetchNotifications, resetNotifications]);
 
   const markChatAsRead = (chatId) => {
     if (socket && currentUser) {
       socket.emit("markChatAsRead", { chatId, userId: currentUser.id });
+    } else if (currentUser) {
+      // Fallback: just refresh notifications when socket is not available
+      console.log('Socket not available, refreshing notifications after chat read');
+      setTimeout(() => {
+        fetchNotifications();
+      }, 1000); // Small delay to allow API to process the chat read
     }
   };
 
