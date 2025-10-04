@@ -14,21 +14,23 @@ export const SocketContextProvider = ({ children }) => {
   const { fetch: fetchNotifications, reset: resetNotifications } = useNotificationStore();
 
   useEffect(() => {
-    // Temporarily disable Socket.IO in production due to Vercel serverless limitations
-    if (process.env.NODE_ENV === 'production') {
-      console.log('Socket.IO disabled in production - using API polling for notifications');
-      setConnectionStatus('disabled');
-      return;
-    }
+    const socketURL = process.env.NODE_ENV === 'production' 
+      ? "https://real-estate-poject.vercel.app" 
+      : "http://localhost:4000";
     
-    const socketURL = "http://localhost:4000";
     console.log('Mode:', process.env.NODE_ENV);
+    console.log('Socket URL:', socketURL);
     console.log('Attempting to connect to socket:', socketURL);
     
     const newSocket = io(socketURL, {
-      transports: ['websocket', 'polling'],
+      transports: process.env.NODE_ENV === 'production' 
+        ? ['polling', 'websocket'] // Use polling first in production
+        : ['websocket', 'polling'],
       timeout: 20000,
       forceNew: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
     });
     
     setSocket(newSocket);
@@ -44,10 +46,9 @@ export const SocketContextProvider = ({ children }) => {
       console.error('Error details:', error);
       setConnectionStatus('error');
       
-      // In production, if socket fails, continue without real-time features
-      if (process.env.NODE_ENV === 'production') {
-        console.warn('Socket connection failed in production, continuing without real-time features');
-      }
+      // Set socket to null if connection fails
+      setSocket(null);
+      console.warn('Socket connection failed, will use polling for notifications');
     });
     
     newSocket.on('disconnect', (reason) => {
@@ -98,13 +99,13 @@ export const SocketContextProvider = ({ children }) => {
           // Refresh notifications when someone else reads a chat
           fetchNotifications();
         });
-      } else if (process.env.NODE_ENV === 'production') {
-        // Fallback polling mode when Socket.IO is disabled
-        console.log('Setting up notification polling (30 seconds interval)');
+      } else {
+        // Fallback polling mode when Socket.IO is not available
+        console.log('Setting up notification polling (10 seconds interval)');
         pollingInterval = setInterval(() => {
           console.log('Polling for notifications...');
           fetchNotifications();
-        }, 30000); // Poll every 30 seconds
+        }, 10000); // Poll every 10 seconds when no socket
       }
       
       // Cleanup function

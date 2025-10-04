@@ -23,64 +23,82 @@ function Chat({ chats: initialChats }) {
     }
   }, [initialChats]);
   
-  // Socket listeners for real-time updates
+  // Socket listeners for real-time updates or polling fallback
   useEffect(() => {
-    if (socket && currentUser) {
-      // Listen for new messages to update chat list appearance
-      const handleNewMessage = (data) => {
-        console.log('New message received in chat list:', data);
+    if (currentUser) {
+      if (socket) {
+        // Real-time mode with Socket.IO
+        // Listen for new messages to update chat list appearance
+        const handleNewMessage = (data) => {
+          console.log('New message received in chat list:', data);
+          
+          // Don't update UI if current user is the sender of the message
+          if (data.userId === currentUser.id) {
+            console.log('Message is from current user, skipping UI update');
+            return;
+          }
+          
+          // Update the specific chat's seenBy status
+          setChats(prevChats => 
+            prevChats.map(chatItem => {
+              if (chatItem.id === data.chatId) {
+                // Only mark as unread if this chat is not currently open
+                const isCurrentlyOpen = chat && chat.id === data.chatId;
+                const seenBy = isCurrentlyOpen 
+                  ? chatItem.seenBy // Keep current seenBy if chat is open
+                  : chatItem.seenBy.filter(id => id !== currentUser.id); // Mark as unread
+                
+                return {
+                  ...chatItem,
+                  seenBy,
+                  lastMessage: data.text
+                };
+              }
+              return chatItem;
+            })
+          );
+        };
         
-        // Don't update UI if current user is the sender of the message
-        if (data.userId === currentUser.id) {
-          console.log('Message is from current user, skipping UI update');
-          return;
-        }
+        // Listen for chat marked as read events
+        const handleChatMarkedAsRead = ({ chatId, userId }) => {
+          console.log('Chat marked as read:', chatId, 'by user:', userId);
+          setChats(prevChats => 
+            prevChats.map(chatItem => {
+              if (chatItem.id === chatId) {
+                // Add user to seenBy array if not already there
+                const seenBy = chatItem.seenBy.includes(userId) 
+                  ? chatItem.seenBy 
+                  : [...chatItem.seenBy, userId];
+                return { ...chatItem, seenBy };
+              }
+              return chatItem;
+            })
+          );
+        };
         
-        // Update the specific chat's seenBy status
-        setChats(prevChats => 
-          prevChats.map(chatItem => {
-            if (chatItem.id === data.chatId) {
-              // Only mark as unread if this chat is not currently open
-              const isCurrentlyOpen = chat && chat.id === data.chatId;
-              const seenBy = isCurrentlyOpen 
-                ? chatItem.seenBy // Keep current seenBy if chat is open
-                : chatItem.seenBy.filter(id => id !== currentUser.id); // Mark as unread
-              
-              return {
-                ...chatItem,
-                seenBy,
-                lastMessage: data.text
-              };
-            }
-            return chatItem;
-          })
-        );
-      };
-      
-      // Listen for chat marked as read events
-      const handleChatMarkedAsRead = ({ chatId, userId }) => {
-        console.log('Chat marked as read:', chatId, 'by user:', userId);
-        setChats(prevChats => 
-          prevChats.map(chatItem => {
-            if (chatItem.id === chatId) {
-              // Add user to seenBy array if not already there
-              const seenBy = chatItem.seenBy.includes(userId) 
-                ? chatItem.seenBy 
-                : [...chatItem.seenBy, userId];
-              return { ...chatItem, seenBy };
-            }
-            return chatItem;
-          })
-        );
-      };
-      
-      socket.on("getMessage", handleNewMessage);
-      socket.on("chatMarkedAsRead", handleChatMarkedAsRead);
-      
-      return () => {
-        socket.off("getMessage", handleNewMessage);
-        socket.off("chatMarkedAsRead", handleChatMarkedAsRead);
-      };
+        socket.on("getMessage", handleNewMessage);
+        socket.on("chatMarkedAsRead", handleChatMarkedAsRead);
+        
+        return () => {
+          socket.off("getMessage", handleNewMessage);
+          socket.off("chatMarkedAsRead", handleChatMarkedAsRead);
+        };
+      } else {
+        // Polling mode when socket is not available
+        console.log('Socket not available, setting up chat list polling');
+        const chatListPolling = setInterval(async () => {
+          try {
+            const res = await apiRequest("/chats");
+            setChats(res.data);
+          } catch (err) {
+            console.log('Error polling for chat list:', err);
+          }
+        }, 5000); // Poll every 5 seconds for chat list updates
+        
+        return () => {
+          clearInterval(chatListPolling);
+        };
+      }
     }
   }, [socket, currentUser, chat]);
 
@@ -149,10 +167,15 @@ function Chat({ chats: initialChats }) {
         })
       );
       
-      socket.emit("sendMessage", {
-        receiverId: chat.receiver.id,
-        data: res.data,
-      });
+      // Only emit if socket is available
+      if (socket) {
+        socket.emit("sendMessage", {
+          receiverId: chat.receiver.id,
+          data: res.data,
+        });
+      } else {
+        console.log('Socket not available, message sent but no real-time update');
+      }
     } catch (err) {
       console.log(err);
     }
@@ -171,20 +194,42 @@ function Chat({ chats: initialChats }) {
       }
     };
 
-    if (chat && socket) {
-      const handleGetMessage = (data) => {
-        console.log('Received message:', data);
-        if (chat.id === data.chatId) {
-          setChat((prev) => ({ ...prev, messages: [...prev.messages, data] }));
-          read(); // Auto-mark as read when in chat
-        }
-      };
+    if (chat) {
+      if (socket) {
+        // Real-time mode with Socket.IO
+        const handleGetMessage = (data) => {
+          console.log('Received message:', data);
+          if (chat.id === data.chatId) {
+            setChat((prev) => ({ ...prev, messages: [...prev.messages, data] }));
+            read(); // Auto-mark as read when in chat
+          }
+        };
 
-      socket.on("getMessage", handleGetMessage);
-      
-      return () => {
-        socket.off("getMessage", handleGetMessage);
-      };
+        socket.on("getMessage", handleGetMessage);
+        
+        return () => {
+          socket.off("getMessage", handleGetMessage);
+        };
+      } else {
+        // Polling mode when socket is not available
+        console.log('Socket not available, setting up message polling');
+        const messagePolling = setInterval(async () => {
+          try {
+            const res = await apiRequest("/chats/" + chat.id);
+            if (res.data.messages.length > chat.messages.length) {
+              console.log('New messages found via polling');
+              setChat(prev => ({ ...prev, messages: res.data.messages }));
+              read(); // Auto-mark as read when in chat
+            }
+          } catch (err) {
+            console.log('Error polling for messages:', err);
+          }
+        }, 2000); // Poll every 2 seconds when in active chat
+        
+        return () => {
+          clearInterval(messagePolling);
+        };
+      }
     }
   }, [socket, chat, currentUser.id]);
 
