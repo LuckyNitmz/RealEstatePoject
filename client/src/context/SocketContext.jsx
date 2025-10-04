@@ -13,15 +13,27 @@ export const SocketContextProvider = ({ children }) => {
   const { fetch: fetchNotifications, reset: resetNotifications } = useNotificationStore();
 
   useEffect(() => {
-    // Temporarily disable socket in production due to Vercel serverless limitations
-    if (process.env.NODE_ENV === 'production') {
-      console.log('Socket.IO disabled in production - using polling fallback');
-      return; // Skip socket connection in production
-    }
+    const socketURL = process.env.NODE_ENV === 'production' 
+      ? "https://socket-real-estate-app.vercel.app" 
+      : "http://localhost:4000";
     
-    const socketURL = "http://localhost:4000";
-    const newSocket = io(socketURL);
+    const newSocket = io(socketURL, {
+      transports: process.env.NODE_ENV === 'production' 
+        ? ['polling', 'websocket'] // Fallback to polling first in production
+        : ['websocket', 'polling'],
+      timeout: 20000,
+      forceNew: true,
+    });
+    
     setSocket(newSocket);
+    
+    newSocket.on('connect', () => {
+      console.log('Socket connected:', newSocket.id);
+    });
+    
+    newSocket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+    });
 
     // Clean up on unmount
     return () => {

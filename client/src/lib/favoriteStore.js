@@ -20,7 +20,13 @@ export const useFavoriteStore = create((set, get) => ({
       set({ favorites: favoriteIds, isLoading: false, lastUpdated: Date.now() });
     } catch (error) {
       console.error("Failed to initialize favorites:", error);
-      set({ isLoading: false });
+      // If it's an auth error, clear favorites but don't retry
+      if (error.response?.status === 401) {
+        console.log('User not authenticated, clearing favorites');
+        set({ favorites: new Set(), isLoading: false });
+      } else {
+        set({ isLoading: false });
+      }
     }
   },
   

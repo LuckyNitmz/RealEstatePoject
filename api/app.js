@@ -12,7 +12,7 @@ const app = express();
 
 const allowedOrigins = [
   "http://localhost:5173", // Development
-  "https://real-estate-poject-wwr3.vercel.app", // Production
+  "https://real-estate-poject-wwr3.vercel.app", // Production frontend
   process.env.CLIENT_URL // Environment variable fallback
 ].filter(Boolean);
 
@@ -24,13 +24,15 @@ app.use(cors({
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
+      console.log('CORS blocked origin:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
-  exposedHeaders: ['Set-Cookie']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Requested-With'],
+  exposedHeaders: ['Set-Cookie'],
+  optionsSuccessStatus: 200 // Support legacy browsers
 }));
 app.use(express.json());
 app.use(cookieParser());
@@ -38,6 +40,21 @@ app.use(cookieParser());
 // Root route for health check
 app.get("/", (req, res) => {
   res.json({ message: "Real Estate API is running!", timestamp: new Date().toISOString() });
+});
+
+// Debug route to check authentication
+app.get("/api/debug/auth", (req, res) => {
+  res.json({
+    message: "Debug endpoint",
+    cookies: req.cookies,
+    headers: {
+      authorization: req.headers.authorization,
+      cookie: req.headers.cookie,
+      origin: req.headers.origin,
+      referer: req.headers.referer
+    },
+    timestamp: new Date().toISOString()
+  });
 });
 
 // API routes

@@ -14,7 +14,13 @@ export const useNotificationStore = create((set, get) => ({
       set({ number: res.data, isLoading: false });
     } catch (error) {
       console.error('Failed to fetch notifications:', error);
-      set({ isLoading: false });
+      // If it's an auth error, reset notifications
+      if (error.response?.status === 401) {
+        console.log('User not authenticated, resetting notifications');
+        set({ number: 0, isLoading: false });
+      } else {
+        set({ isLoading: false });
+      }
     }
   },
   

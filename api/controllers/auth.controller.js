@@ -68,10 +68,10 @@ export const login = async (req, res) => {
     res
       .cookie("token", token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production', // Enable secure in production
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Allow cross-site cookies in production
+        secure: true, // Always secure for HTTPS in production
+        sameSite: 'none', // Required for cross-origin cookies
         maxAge: age,
-        domain: process.env.NODE_ENV === 'production' ? '.vercel.app' : undefined, // Allow subdomain sharing
+        // Remove domain restriction - let browser handle it automatically
       })
       .status(200)
       .json(userInfo);
@@ -82,5 +82,9 @@ export const login = async (req, res) => {
 };
 
 export const logout = (req, res) => {
-  res.clearCookie("token").status(200).json({ message: "Logout Successful" });
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none'
+  }).status(200).json({ message: "Logout Successful" });
 };
