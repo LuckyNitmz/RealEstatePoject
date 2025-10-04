@@ -14,23 +14,30 @@ export const SocketContextProvider = ({ children }) => {
   const { fetch: fetchNotifications, reset: resetNotifications } = useNotificationStore();
 
   useEffect(() => {
-    const socketURL = process.env.NODE_ENV === 'production' 
-      ? "https://real-estate-poject.vercel.app" 
-      : "http://localhost:4000";
+    // Use the same environment detection as apiRequest.js
+    const isDevelopment = process.env.NODE_ENV !== 'production' || 
+      window.location.hostname === 'localhost' || 
+      window.location.hostname === '127.0.0.1';
     
-    console.log('Mode:', process.env.NODE_ENV);
+    // Socket server URL - make sure this matches your actual deployed socket server
+    const socketURL = isDevelopment 
+      ? "http://localhost:4000" 
+      : "https://real-estate-poject.vercel.app"; // ⚠️ VERIFY this is your actual socket server URL
+    
+    console.log('Environment detection:', { isDevelopment, hostname: window.location.hostname });
     console.log('Socket URL:', socketURL);
     console.log('Attempting to connect to socket:', socketURL);
     
     const newSocket = io(socketURL, {
-      transports: process.env.NODE_ENV === 'production' 
-        ? ['polling', 'websocket'] // Use polling first in production
-        : ['websocket', 'polling'],
-      timeout: 20000,
+      transports: isDevelopment 
+        ? ['websocket', 'polling'] // Try websocket first in development
+        : ['polling', 'websocket'], // Use polling first in production
+      timeout: isDevelopment ? 10000 : 20000, // Shorter timeout in dev
       forceNew: true,
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: isDevelopment ? 3 : 5,
       reconnectionDelay: 1000,
+      autoConnect: true,
     });
     
     setSocket(newSocket);
@@ -44,11 +51,24 @@ export const SocketContextProvider = ({ children }) => {
     newSocket.on('connect_error', (error) => {
       console.error('Socket connection error:', error.message);
       console.error('Error details:', error);
+      console.error('Transport:', error.transport);
       setConnectionStatus('error');
       
-      // Set socket to null if connection fails
+      // Don't set socket to null immediately, let it retry
+      console.warn('Socket connection failed, retrying...');
+    });
+    
+    // Handle reconnection attempts
+    newSocket.on('reconnect_attempt', (attemptNumber) => {
+      console.log(`Reconnection attempt ${attemptNumber}`);
+      setConnectionStatus('reconnecting');
+    });
+    
+    newSocket.on('reconnect_failed', () => {
+      console.error('Socket reconnection failed completely');
+      setConnectionStatus('failed');
       setSocket(null);
-      console.warn('Socket connection failed, will use polling for notifications');
+      console.warn('Socket connection permanently failed, will use polling for notifications');
     });
     
     newSocket.on('disconnect', (reason) => {
