@@ -13,7 +13,7 @@ export const SocketContextProvider = ({ children }) => {
   const { fetch: fetchNotifications, reset: resetNotifications } = useNotificationStore();
 
   useEffect(() => {
-    const newSocket = io("http://localhost:4000");
+    const newSocket = io(import.meta.env.VITE_SOCKET_URL || "http://localhost:4000");
     setSocket(newSocket);
 
     // Clean up on unmount

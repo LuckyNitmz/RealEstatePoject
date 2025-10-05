@@ -2,7 +2,8 @@ import { Server } from "socket.io";
 
 const io = new Server({
   cors: {
-    origin: "http://localhost:5173",
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    credentials: true,
   },
 });
 
@@ -91,5 +92,6 @@ io.on("connection", (socket) => {
   });
 });
 
-io.listen("4000");
-console.log('Socket.io server running on port 4000');
+const PORT = process.env.PORT || 4000;
+io.listen(PORT);
+console.log(`Socket.io server running on port ${PORT}`);
